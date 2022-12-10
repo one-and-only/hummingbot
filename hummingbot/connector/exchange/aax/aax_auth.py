@@ -14,12 +14,6 @@ class AAXAuth(AuthBase):
         self.time_provider = time_provider
 
     async def rest_authenticate(self, request: RESTRequest) -> RESTRequest:
-        """
-        Adds the server time and the signature to the request, required for authenticated interactions. It also adds
-        the required parameter in the request header.
-        :param request: the request to be configured for authenticated interaction
-        """
-
         headers = {}
         if request.headers is not None:
             headers.update(request.headers)
