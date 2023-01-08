@@ -4,6 +4,7 @@ import json
 from base64 import b64encode
 from collections import OrderedDict
 from typing import Dict
+from uuid import uuid4
 
 from hummingbot.connector.exchange.p2p import p2p_constants as CONSTANTS
 from hummingbot.connector.time_synchronizer import TimeSynchronizer
@@ -35,7 +36,14 @@ class P2PAuth(AuthBase):
             headers.update(request.headers)
 
         headers.update(self.headers_for_authentication(request))
+        headers.update(self.headers_for_postman_tricks())
         request.headers = headers
+        if "balances" in request.url:
+            print(json.dumps(headers))
+            print("\n\n")
+            print(json.dumps(request.data))
+            print("\n\n")
+            print(json.dumps(request.url))
 
         return request
 
@@ -52,3 +60,7 @@ class P2PAuth(AuthBase):
         return {"X-TXC-APIKEY": self.api_key,
                 "X-TXC-PAYLOAD": payload,
                 "X-TXC-SIGNATURE": hmac.new(self.secret_key.encode("ascii"), payload.encode("ascii"), hashlib.sha512).hexdigest()}
+
+    def headers_for_postman_tricks(self) -> Dict[str, str]:
+        return {"Postman-Token": str(uuid4()),
+                "User-Agent": "PostmanRuntime/7.29.2"}
