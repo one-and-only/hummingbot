@@ -34,7 +34,7 @@ class P2PAuth(AuthBase):
         if request.headers is not None:
             headers.update(request.headers)
 
-        headers.update(self.header_for_authentication(request))
+        headers.update(self.headers_for_authentication(request))
         request.headers = headers
 
         return request
@@ -46,7 +46,7 @@ class P2PAuth(AuthBase):
         """
         return request  # pass-through
 
-    def header_for_authentication(self, request: RESTRequest) -> Dict[str, str]:
+    def headers_for_authentication(self, request: RESTRequest) -> Dict[str, str]:
         payload = b64encode(json.dumps(request.data).encode("ascii")).decode("ascii")
 
         return {"X-TXC-APIKEY": self.api_key,
