@@ -517,7 +517,7 @@ class P2pExchange(ExchangePyBase):
     async def _get_last_traded_price(self, trading_pair: str) -> float:
         resp_json = await self._api_get(
             path_url=CONSTANTS.TICKER_PRICE_URL.format(await self.exchange_symbol_associated_to_pair(trading_pair=trading_pair)),
-            limit_id=CONSTANTS.BALANCES_PATH_URL
+            limit_id=CONSTANTS.TICKER_PRICE_URL
         )
 
         return float(resp_json["result"]["last"])
