@@ -69,7 +69,8 @@ async def get_current_server_time(
     api_factory = build_api_factory_without_time_synchronizer_pre_processor(throttler=throttler)
     rest_assistant = await api_factory.get_rest_assistant()
     response = await rest_assistant.execute_request(
-        url="https://worldtimeapi.org/api/timezone/America/Chicago",  # note: time zone doesn't matter since we're using the unix timestamp
+        url="https://worldtimeapi.org/api/timezone/America/Chicago",  # note: time zone doesn't matter since we're using the unix timestamp,
+        throttler_limit_id=CONSTANTS.CURRENT_TIME_FULL_URL,
         method=RESTMethod.GET,
     )
     return response["unixtime"] * 1e3
