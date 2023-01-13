@@ -8,7 +8,7 @@ from typing import Dict
 from hummingbot.connector.exchange.p2p import p2p_constants as CONSTANTS
 from hummingbot.connector.time_synchronizer import TimeSynchronizer
 from hummingbot.core.web_assistant.auth import AuthBase
-from hummingbot.core.web_assistant.connections.data_types import RESTMethod, RESTRequest, WSRequest
+from hummingbot.core.web_assistant.connections.data_types import RESTRequest, WSRequest
 
 
 class P2PAuth(AuthBase):
@@ -18,12 +18,7 @@ class P2PAuth(AuthBase):
         self.time_provider = time_provider
 
     async def rest_authenticate(self, request: RESTRequest) -> RESTRequest:
-        # Public requests don't need auth
-        # Requests are either GET or POST
-        if request.method == RESTMethod.GET:
-            return request
-
-        # There are some endpoints that don't require more than basic params
+        # All private requests require some "basic" params
         data = OrderedDict() if request.data is None else OrderedDict(json.loads(request.data))
         data["request"] = request.url.split(f".{CONSTANTS.DEFAULT_DOMAIN}")[1]
         data["nonce"] = int(self.time_provider.time() * 1e3)
