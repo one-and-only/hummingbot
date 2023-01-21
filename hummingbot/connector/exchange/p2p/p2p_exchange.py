@@ -56,17 +56,15 @@ class P2pExchange(ExchangePyBase):
     def p2p_order_type(order_type: OrderType) -> str:
         return order_type.name.upper()
 
-    async def p2p_private_request(self, path_url, data=None, return_err=False, headers={}) -> Dict[str, Any]:
+    async def p2p_private_request(self, path_url, data=None, return_err=False, headers={}, method=RESTMethod.POST) -> Dict[str, Any]:
         api_url = f"{CONSTANTS.REST_URL.format(CONSTANTS.DEFAULT_DOMAIN)}{CONSTANTS.API_VERSION}{path_url}"
 
         local_headers = {
             "Content-Type": "application/json"}
         local_headers.update(headers)
 
-        # data = json.dumps(data) if data is not None else data
-
         request = P2PRESTRequest(
-            method=RESTMethod.POST,
+            method=method,
             url=api_url,
             data=data,
             headers=local_headers,
@@ -216,11 +214,7 @@ class P2pExchange(ExchangePyBase):
                       "amount": amount_str,
                       "price": price_str}
 
-        order_result = await self._api_post(
-            path_url=CONSTANTS.NEW_ORDER_PATH_URL,
-            data=api_params,
-            is_auth_required=True,
-            limit_id=CONSTANTS.NEW_ORDER_PATH_URL)
+        order_result = await self.p2p_private_request(CONSTANTS.NEW_ORDER_PATH_URL, api_params)
         o_id = str(order_result["result"]["orderId"])
         transact_time = int(order_result["result"]["timestamp"])
         return (o_id, transact_time)
@@ -231,12 +225,8 @@ class P2pExchange(ExchangePyBase):
             "market": symbol,
             "orderId": order_id,
         }
-        cancel_result = await self._api_delete(
-            path_url=CONSTANTS.CANCEL_ORDER_PATH_URL,
-            params=api_params,
-            is_auth_required=True,
-            limit_id=CONSTANTS.CANCEL_ORDER_PATH_URL)
-        return cancel_result.get("success")
+        cancel_result = await self.p2p_private_request(CONSTANTS.CANCEL_ORDER_PATH_URL, api_params)
+        return cancel_result["success"]
 
     # TODO understand how this works 😳
     async def _format_trading_rules(self, exchange_info_dict: Dict[str, Any]) -> List[TradingRule]:
@@ -410,20 +400,12 @@ class P2pExchange(ExchangePyBase):
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
         trading_pair = await self.exchange_symbol_associated_to_pair(trading_pair=tracked_order.trading_pair)
 
-        pending_orders = await self._api_post(
-            path_url=CONSTANTS.PENDING_ORDERS_PATH_URL,
-            is_auth_required=True,
-            limit_id=CONSTANTS.PENDING_ORDERS_PATH_URL
-        )
+        pending_orders = await self.p2p_private_request(CONSTANTS.PENDING_ORDERS_PATH_URL)
         for order in pending_orders["result"]:
             if (tracked_order.exchange_order_id == str(order["id"])):
                 return self._order_update_from_order(str(order["id"]), tracked_order.trading_pair, CONSTANTS.OrderState.OPEN if order["amount"] == order["left"] else CONSTANTS.OrderState.PARTIALLY_FILLED)
 
-        executed_orders = await self._api_post(
-            path_url=CONSTANTS.ORDER_HISTORY_PATH_URL,
-            is_auth_required=True,
-            limit_id=CONSTANTS.ORDER_HISTORY_PATH_URL
-        )
+        executed_orders = await self.p2p_private_request(CONSTANTS.ORDER_HISTORY_PATH_URL)
         for order in executed_orders["result"][trading_pair]:
             if (tracked_order.exchange_order_id == str(order["id"])):
                 return self._order_update_from_order(str(order["id"]), trading_pair, CONSTANTS.OrderState.COMPLETED)
