@@ -9,13 +9,17 @@ from hummingbot.connector.exchange.p2p import p2p_constants as CONSTANTS, p2p_ut
 from hummingbot.connector.exchange.p2p.p2p_api_order_book_data_source import P2PAPIOrderBookDataSource
 from hummingbot.connector.exchange.p2p.p2p_api_user_stream_data_source import P2PAPIUserStreamDataSource
 from hummingbot.connector.exchange.p2p.p2p_auth import P2PAuth
+from hummingbot.connector.exchange.p2p.p2p_utils import P2PRESTRequest
+from hummingbot.connector.exchange.p2p.p2p_web_utils import build_api_factory
 from hummingbot.connector.exchange_py_base import ExchangePyBase
+from hummingbot.connector.time_synchronizer import TimeSynchronizer
 from hummingbot.connector.trading_rule import TradingRule
 from hummingbot.core.data_type.common import OrderType, TradeType
 from hummingbot.core.data_type.in_flight_order import InFlightOrder, OrderState, OrderUpdate, TradeUpdate
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
 from hummingbot.core.data_type.trade_fee import DeductedFromReturnsTradeFee, TokenAmount, TradeFeeBase
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
+from hummingbot.core.web_assistant.connections.data_types import RESTMethod
 from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFactory
 
 if TYPE_CHECKING:
@@ -43,11 +47,48 @@ class P2pExchange(ExchangePyBase):
         self._trading_required = trading_required
         self._trading_pairs = trading_pairs
         self._last_trades_poll_p2p_timestamp = 1.0
+        self._time_synchronizer = TimeSynchronizer()
+        self._auth = P2PAuth(self.api_key, self.secret_key, self._time_synchronizer)
+        self._web_assistants_factory = build_api_factory(time_synchronizer=self._time_synchronizer, auth=self._auth)
         super().__init__(client_config_map)
 
     @staticmethod
     def p2p_order_type(order_type: OrderType) -> str:
         return order_type.name.upper()
+
+    async def p2p_private_request(self, path_url, data=None, return_err=False, headers={}) -> Dict[str, Any]:
+        api_url = f"{CONSTANTS.REST_URL.format(CONSTANTS.DEFAULT_DOMAIN)}{CONSTANTS.API_VERSION}{path_url}"
+
+        local_headers = {
+            "Content-Type": "application/json"}
+        local_headers.update(headers)
+
+        # data = json.dumps(data) if data is not None else data
+
+        request = P2PRESTRequest(
+            method=RESTMethod.POST,
+            url=api_url,
+            data=data,
+            headers=local_headers,
+            is_auth_required=True,
+            throttler_limit_id=path_url
+        )
+
+        rest_assistant = await self._web_assistants_factory.get_rest_assistant()
+        async with self._web_assistants_factory.throttler.execute_task(limit_id=path_url):
+            response = await rest_assistant.call(request=request, timeout=10)
+
+            if 400 <= response.status:
+                if return_err:
+                    error_response = await response.json()
+                    return error_response
+                else:
+                    error_response = await response.text()
+                    error_text = "N/A" if "<html" in error_response else error_response
+                    raise IOError(f"Error executing request POST {api_url}. HTTP status is {response.status}. "
+                                  f"Error: {error_text}")
+            result = await response.json()
+            return result
 
     @staticmethod
     def to_hb_order_type(p2p_type: str) -> OrderType:
@@ -491,16 +532,16 @@ class P2pExchange(ExchangePyBase):
         local_asset_names = set(self._account_balances.keys())
         remote_asset_names = set()
 
-        balance_info = await self._api_post(
-            path_url=CONSTANTS.BALANCES_PATH_URL,
-            is_auth_required=True,
-            limit_id=CONSTANTS.BALANCES_PATH_URL)
+        balance_info = await self.p2p_private_request(CONSTANTS.BALANCES_PATH_URL, data={})
+
+        if not balance_info["success"]:
+            return False
 
         balances = balance_info["result"]
-        for asset_name, asset in balances:
-            self._account_available_balances[asset_name] = Decimal(asset["available"])
-            self._account_balances[asset_name] = Decimal(asset["available"]) + Decimal(asset["freeze"])
-            remote_asset_names.add(asset_name)
+        for asset in balances:
+            self._account_available_balances[asset] = Decimal(balances[asset]["available"])
+            self._account_balances[asset] = Decimal(balances[asset]["available"]) + Decimal(balances[asset]["freeze"])
+            remote_asset_names.add(asset)
 
         asset_names_to_remove = local_asset_names.difference(remote_asset_names)
         for name in asset_names_to_remove:

@@ -1,11 +1,15 @@
 import re
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict
 
+import ujson
 from pydantic import Field, SecretStr
 
+import hummingbot.connector.exchange.p2p.p2p_constants as CONSTANTS
 from hummingbot.client.config.config_data_types import BaseConnectorConfigMap, ClientFieldData
 from hummingbot.core.data_type.trade_fee import TradeFeeSchema
+from hummingbot.core.web_assistant.connections.data_types import EndpointRESTRequest, RESTMethod
 
 CENTRALIZED = True
 EXAMPLE_PAIR = "YFI_BTC"
@@ -51,6 +55,24 @@ class P2PConfigMap(BaseConnectorConfigMap):
 
     class Config:
         title = "p2p"
+
+# We need forward slashes unescaped for auth endpoints to work fine
+
+
+@dataclass
+class P2PRESTRequest(EndpointRESTRequest):
+    def _ensure_data(self):
+        if self.method == RESTMethod.POST:
+            if self.data is not None:
+                self.data = ujson.dumps(self.data, escape_forward_slashes=False)
+        elif self.data is not None:
+            raise ValueError(
+                "The `data` field should be used only for POST requests. Use `params` instead."
+            )
+
+    @property
+    def base_url(self) -> str:
+        return CONSTANTS.REST_URL.format(CONSTANTS.DEFAULT_DOMAIN) + CONSTANTS.PRIVATE_API_VERSION
 
 
 KEYS = P2PConfigMap.construct()

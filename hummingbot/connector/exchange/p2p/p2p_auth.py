@@ -2,13 +2,13 @@ import hashlib
 import hmac
 import json
 from base64 import b64encode
-from collections import OrderedDict
 from typing import Dict
 
 from hummingbot.connector.exchange.p2p import p2p_constants as CONSTANTS
+from hummingbot.connector.exchange.p2p.p2p_utils import P2PRESTRequest
 from hummingbot.connector.time_synchronizer import TimeSynchronizer
 from hummingbot.core.web_assistant.auth import AuthBase
-from hummingbot.core.web_assistant.connections.data_types import RESTRequest, WSRequest
+from hummingbot.core.web_assistant.connections.data_types import WSRequest
 
 
 class P2PAuth(AuthBase):
@@ -17,9 +17,9 @@ class P2PAuth(AuthBase):
         self.secret_key = secret_key
         self.time_provider = time_provider
 
-    async def rest_authenticate(self, request: RESTRequest) -> RESTRequest:
+    async def rest_authenticate(self, request: P2PRESTRequest) -> P2PRESTRequest:
         # All private requests require some "basic" params
-        data = OrderedDict() if request.data is None else OrderedDict(json.loads(request.data))
+        data = {} if request.data is None else dict(json.loads(request.data))
         data["request"] = request.url.split(f".{CONSTANTS.DEFAULT_DOMAIN}")[1]
         data["nonce"] = int(self.time_provider.time() * 1e3)
 
@@ -41,8 +41,8 @@ class P2PAuth(AuthBase):
         """
         return request  # pass-through
 
-    def headers_for_authentication(self, request: RESTRequest) -> Dict[str, str]:
-        payload = b64encode(json.dumps(request.data).encode("ascii")).decode("ascii")
+    def headers_for_authentication(self, request: P2PRESTRequest) -> Dict[str, str]:
+        payload = b64encode(json.dumps(request.data, separators=(',', ':')).encode("ascii")).decode("ascii")
 
         return {"X-TXC-APIKEY": self.api_key,
                 "X-TXC-PAYLOAD": payload,

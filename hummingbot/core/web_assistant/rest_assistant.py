@@ -81,6 +81,8 @@ class RESTAssistant:
         request = deepcopy(request)
         request = await self._pre_process_request(request)
         request = await self._authenticate(request)
+        request.headers["Content-Type"] = "application/json" if request.method.value in ["PUT", "POST"] else "application/x-www-form-urlencoded"
+        # print(json.dumps(request.headers))
         resp = await wait_for(self._connection.call(request), timeout)
         resp = await self._post_process_response(resp)
         return resp

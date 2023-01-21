@@ -1,4 +1,5 @@
 import aiohttp
+
 from hummingbot.core.web_assistant.connections.data_types import RESTRequest, RESTResponse
 
 
@@ -11,7 +12,8 @@ class RESTConnection:
             method=request.method.value,
             url=request.url,
             params=request.params,
-            data=request.data,
+            # data=request.data,
+            json=request.data,
             headers=request.headers,
         )
 

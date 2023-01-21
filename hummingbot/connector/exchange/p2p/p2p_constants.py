@@ -12,6 +12,7 @@ WSS_URL = "wss://apiws.p2pb2b.{}/"
 
 PUBLIC_API_VERSION = "v2"
 PRIVATE_API_VERSION = "v2"
+API_VERSION = "v2"
 
 # Time endpoint
 CURRENT_TIME_FULL_URL = "https://worldtimeapi.org/api/timezone/America/Chicago"
